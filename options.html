@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Collaboration Assistant – Settings</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="options">
+  <main class="page">
+    <header class="head">
+      <img src="icons/icon48.png" alt="" width="40" height="40">
+      <div>
+        <h1>Collaboration Assistant</h1>
+        <p class="sub">Click the To, Subject or Message box of an email and a <b>Paste</b> button appears.
+          Clicking it inserts the text you set here. Or click <b>Auto Fill</b> in the email's title bar to
+          fill all three at once. Changes save automatically.</p>
+      </div>
+    </header>
+
+    <section class="card" aria-labelledby="presets-title">
+      <div class="card-head">
+        <h2 id="presets-title">Presets</h2>
+        <p>Leave a box empty to hide the Paste button on that field.</p>
+      </div>
+      <div class="field">
+        <label for="preset-to">To</label>
+        <input id="preset-to" data-preset="to" spellcheck="false"
+               placeholder="name@example.com, other@example.com">
+        <span class="hint">Separate several recipients with commas.</span>
+        <span class="note" data-to-note hidden></span>
+      </div>
+      <div class="field">
+        <label for="preset-subject">Subject</label>
+        <input id="preset-subject" data-preset="subject" placeholder="Subject line">
+      </div>
+      <div class="field">
+        <label for="preset-body">Message</label>
+        <textarea id="preset-body" data-preset="body" rows="10" placeholder="Hi,&#10;&#10;…"></textarea>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="list-title">
+      <div class="card-head">
+        <h2 id="list-title">Email list</h2>
+        <p>Addresses you plan to write to, one per line. Each Paste in a To box, or each Auto Fill, uses the
+          next one and moves down the list. While the list has unused addresses, it takes the place of the To text above.</p>
+      </div>
+      <div class="list-status">
+        <span class="list-label">Next recipient</span>
+        <span class="list-next" data-list-next></span>
+        <span class="hint" data-list-progress></span>
+      </div>
+      <div class="field">
+        <label for="email-list">Emails to send to, one per line</label>
+        <textarea id="email-list" class="mono" data-email-list rows="10" spellcheck="false"
+                  placeholder="alice@example.com&#10;bob@example.com&#10;carol@example.com"></textarea>
+        <span class="hint warn" data-list-invalid></span>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" data-list-action="undo" title="Make the last used email the next one again">Undo last</button>
+        <button type="button" class="btn" data-list-action="skip" title="Skip the next email without using it">Skip</button>
+        <button type="button" class="btn" data-list-action="reset" title="Mark every email as unused">Start over</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="sites-title">
+      <div class="card-head">
+        <h2 id="sites-title">Sites</h2>
+        <p>The button works on email compose forms on any site: any page with a To box plus a Subject
+          or message box. List sites below to switch it off there (subdomains included), one per line.
+          You can also switch the current site off from the toolbar popup.</p>
+      </div>
+      <div class="field">
+        <label for="disabled-sites">Switched off on</label>
+        <textarea id="disabled-sites" class="mono" data-disabled-sites rows="5" spellcheck="false"
+                  placeholder="example.com"></textarea>
+      </div>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Advanced: custom field selectors</summary>
+        <div class="card-body">
+          <p class="hint">Fields are detected automatically from their labels. If a field on your mail site is
+            missed, enter a CSS selector for it (or for its wrapper), e.g. <code>#message-to-field</code> or
+            <code>[aria-label="Message body"]</code>.</p>
+          <div class="field">
+            <label for="selector-to">To field selector</label>
+            <input id="selector-to" class="mono" data-selector="to" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="selector-subject">Subject field selector</label>
+            <input id="selector-subject" class="mono" data-selector="subject" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="selector-body">Message field selector</label>
+            <input id="selector-body" class="mono" data-selector="body" spellcheck="false">
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <div class="save-bar"><span class="status" data-status aria-live="polite"></span></div>
+  </main>
+
+  <script src="common.js"></script>
+  <script src="ui.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

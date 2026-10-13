@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Collaboration Assistant</title>
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body class="popup">
+  <header class="head">
+    <img src="icons/icon32.png" alt="" width="26" height="26">
+    <div>
+      <h1>Collaboration Assistant</h1>
+      <p class="sub">Text for the Paste and Auto Fill buttons</p>
+    </div>
+  </header>
+
+  <label class="site" for="site-toggle">
+    <span class="site-text">
+      <span class="site-label">Active on this site</span>
+      <span class="site-host" id="site-host">Checking…</span>
+    </span>
+    <input type="checkbox" id="site-toggle" class="switch" disabled>
+  </label>
+
+  <div class="tabs" role="tablist" aria-label="Settings">
+    <button type="button" class="tab" role="tab" id="tab-content" aria-controls="panel-content">Content</button>
+    <button type="button" class="tab" role="tab" id="tab-list" aria-controls="panel-list">
+      Email list <span class="badge" data-list-count></span>
+    </button>
+  </div>
+
+  <section class="panel" role="tabpanel" id="panel-content" aria-labelledby="tab-content">
+    <div class="field">
+      <label for="preset-to">To</label>
+      <input id="preset-to" data-preset="to" spellcheck="false"
+             placeholder="name@example.com, other@example.com">
+      <span class="note" data-to-note hidden></span>
+    </div>
+
+    <div class="field">
+      <label for="preset-subject">Subject</label>
+      <input id="preset-subject" data-preset="subject" placeholder="Subject line">
+    </div>
+
+    <div class="field">
+      <label for="preset-body">Message</label>
+      <textarea id="preset-body" data-preset="body" rows="8" placeholder="Hi,&#10;&#10;…"></textarea>
+    </div>
+  </section>
+
+  <section class="panel" role="tabpanel" id="panel-list" aria-labelledby="tab-list" hidden>
+    <div class="list-status">
+      <span class="list-label">Next recipient</span>
+      <span class="list-next" data-list-next></span>
+      <span class="hint" data-list-progress></span>
+    </div>
+
+    <div class="field">
+      <label for="email-list">Emails to send to, one per line</label>
+      <textarea id="email-list" class="mono" data-email-list rows="10" spellcheck="false"
+                placeholder="alice@example.com&#10;bob@example.com&#10;carol@example.com"></textarea>
+      <span class="hint warn" data-list-invalid></span>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn" data-list-action="undo" title="Make the last used email the next one again">Undo last</button>
+      <button type="button" class="btn" data-list-action="skip" title="Skip the next email without using it">Skip</button>
+      <button type="button" class="btn" data-list-action="reset" title="Mark every email as unused">Start over</button>
+    </div>
+
+    <p class="hint">Each Paste in a To box, or each Auto Fill, uses the next email and moves down the list.</p>
+  </section>
+
+  <footer class="foot">
+    <span class="status" data-status aria-live="polite"></span>
+    <button type="button" class="link" id="open-options">More settings</button>
+  </footer>
+
+  <script src="common.js"></script>
+  <script src="ui.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
