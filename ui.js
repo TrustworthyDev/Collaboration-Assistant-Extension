@@ -63,6 +63,7 @@ globalThis.bindSettingsForm = async function bindSettingsForm() {
   const selectorInputs = [...document.querySelectorAll('[data-selector]')];
   const sitesInput = document.querySelector('[data-disabled-sites]');
   const listInput = document.querySelector('[data-email-list]');
+  const clipboardToggles = [...document.querySelectorAll('[data-use-clipboard]')];
 
   function setText(selector, text) {
     for (const el of document.querySelectorAll(selector)) el.textContent = text;
@@ -100,6 +101,7 @@ globalThis.bindSettingsForm = async function bindSettingsForm() {
       sitesInput.value = settings.disabledSites.join('\n');
     }
     if (listInput && listInput !== document.activeElement) listInput.value = settings.emailList;
+    for (const el of clipboardToggles) el.checked = settings.useClipboard;
     renderList();
   }
 
@@ -127,6 +129,13 @@ globalThis.bindSettingsForm = async function bindSettingsForm() {
       settings.emailList = listInput.value;
       persist('emailList');
       renderList();
+    });
+  }
+
+  for (const el of clipboardToggles) {
+    el.addEventListener('change', () => {
+      settings.useClipboard = el.checked;
+      persist('useClipboard');
     });
   }
 

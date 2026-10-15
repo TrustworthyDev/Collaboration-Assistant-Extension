@@ -709,14 +709,19 @@
   }
 
   function createComposerTracker(subject) {
-    const tracker = { subject, layout: null, layoutAt: 0, anchor: '', busy: false, resetTimer: 0 };
+    const tracker = {
+      subject, layout: null, layoutAt: 0, anchor: '',
+      covered: false, coveredAt: 0, coveredAnchor: '', busy: false, resetTimer: 0,
+    };
     tracker.ui = createFloatingButton(AUTOFILL_BUTTON_TAG, () => runAutoFill(tracker));
     setAutoFillIdle(tracker);
     return tracker;
   }
 
   function setAutoFillIdle(tracker) {
-    tracker.ui.set('Auto Fill', 'fill', '', 'Fill To, Subject and Message with your presets');
+    tracker.ui.set('Auto Fill', 'fill', '', settings.useClipboard
+      ? 'Fill To with the email address you copied, and Subject and Message with your presets'
+      : 'Fill To, Subject and Message with your presets');
   }
 
   function removeComposerTracker(subject) {
@@ -750,12 +755,22 @@
       tracker.ui.hide();
       return;
     }
-    tracker.ui.show(uiParentFor(tracker.subject));
 
     // Reading the header is heavier than a frame's worth of work: redo it when the
     // composer moves, and a few times a second (the title follows the Subject text).
     const anchor = `${Math.round(s.left)},${Math.round(s.top)},${Math.round(s.width)}`;
     const now = performance.now();
+    if (anchor !== tracker.coveredAnchor || now - tracker.coveredAt > 250) {
+      tracker.covered = isCovered(tracker.subject, s);
+      tracker.coveredAt = now;
+      tracker.coveredAnchor = anchor;
+    }
+    if (tracker.covered) {
+      tracker.ui.hide();
+      return;
+    }
+    tracker.ui.show(uiParentFor(tracker.subject));
+
     const maxAge = tracker.layout && tracker.layout.fromHeader ? 300 : 1500;
     if (!tracker.layout || anchor !== tracker.anchor || now - tracker.layoutAt > maxAge) {
       tracker.layout = autoFillLayout(tracker.subject, s, tracker.ui.size());
@@ -843,6 +858,32 @@
     return right;
   }
 
+  // Whether `el` belongs to the composer of `subject`: the smallest element holding both
+  // must not also hold another composer's Subject box. Keeps Auto Fill out of other
+  // composers left open on the page (e.g. one showing "Your message has been sent").
+  function sameComposer(subject, el) {
+    let box = subject.parentElement;
+    while (box && !box.contains(el)) box = box.parentElement;
+    if (!box) return false;
+    return !typedFields(subject.ownerDocument)
+      .some((f) => f.type === 'subject' && f.el !== subject && box.contains(f.el));
+  }
+
+  // True when this composer is hidden or something else, typically another composer
+  // opened on top of it, covers its Subject box. The buttons float in the top layer, so
+  // its Auto Fill button would otherwise sit over the other composer, and a click would
+  // fill and focus the hidden one.
+  function isCovered(subject, s) {
+    if (typeof subject.checkVisibility === 'function' && !subject.checkVisibility({
+      opacityProperty: true, visibilityProperty: true, checkOpacity: true, checkVisibilityCSS: true,
+    })) return true;
+    const x = s.left + Math.min(16, s.width / 2);
+    const y = s.top + s.height / 2;
+    if (x < 0 || y < 0 || x >= window.innerWidth || y >= window.innerHeight) return false;
+    const hit = subject.ownerDocument.elementsFromPoint(x, y).find((node) => !isOwnButton(node));
+    return !!hit && !sameComposer(subject, hit);
+  }
+
   function treeDistance(from, target) {
     let distance = 0;
     for (let node = from; node; node = node.parentElement, distance++) {
@@ -874,22 +915,30 @@
       const editor = doc.body.isContentEditable
         ? doc.body
         : editableRoot(doc.querySelector('[contenteditable]:not([contenteditable="false"])'));
-      if (editor) editors.set(frame, editor);
+      if (editor && sameComposer(subject, frame)) editors.set(frame, editor);
     }
     const frame = nearestTo(subject, editors.keys());
     return frame ? editors.get(frame) : null;
   }
 
   // The To box and message editor that belong with this Subject box: the nearest ones
-  // in the DOM, in case several composers are open.
+  // in its own composer, in case several composers are open.
   function composerParts(subject) {
     const fields = typedFields(subject.ownerDocument, true)
-      .filter((f) => f.el !== subject && sameForm(subject, f.el));
+      .filter((f) => f.el !== subject && sameForm(subject, f.el) && sameComposer(subject, f.el));
     const to = nearestTo(subject, fields.filter((f) => f.type === 'to').map((f) => f.el));
     const body =
       nearestTo(subject, fields.filter((f) => f.type === 'body' || f.type === 'richtext').map((f) => f.el)) ||
+      plainMessageBox(subject) ||
       iframeEditorNear(subject);
     return { to, body };
+  }
+
+  // A plain <textarea> message box without a "body" label, e.g. aria-label="Message".
+  function plainMessageBox(subject) {
+    const boxes = [...subject.ownerDocument.querySelectorAll('textarea')].filter((el) =>
+      editableRoot(el) && sameForm(subject, el) && sameComposer(subject, el) && classify(el) === 'body');
+    return nearestTo(subject, boxes);
   }
 
   // Everything shown before the Subject box in this composer (recipient chips or the
@@ -920,10 +969,61 @@
     return text.split(/[,;](?=(?:[^"]*"[^"]*")*[^"]*$)/).map((s) => s.trim()).filter(Boolean);
   }
 
-  // Recipients Auto Fill should add, given the composer's current recipients: the next
-  // email-list address (unless the email is already addressed to someone on the list),
-  // otherwise the To preset entries that are not there yet.
-  function recipientsToAdd(present) {
+  function readClipboard() {
+    let request;
+    try {
+      request = chrome.runtime.sendMessage({ type: 'read-clipboard' })
+        .then((reply) => (reply && typeof reply.text === 'string' ? reply.text : ''), () => '');
+    } catch (_) {
+      return Promise.resolve('');
+    }
+    return Promise.race([request, pause(2000).then(() => '')]);
+  }
+
+  // The email addresses you copied, e.g. "bob@example.com" or "Bob <bob@example.com>".
+  // Each copied address is used once: if the clipboard still holds the address(es) the
+  // last Auto Fill took from it, they were not copied anew and are ignored, so a
+  // forgotten copy does not write to the same person twice.
+  async function copiedRecipients() {
+    if (!settings.useClipboard) return null;
+    const text = (await readClipboard()).trim();
+    // A long text (a whole email or page) was not copied as a recipient.
+    if (!text || text.length > 1000) return null;
+    const emails = [];
+    const keys = [];
+    for (const email of text.match(/[\w.%+'-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi) || []) {
+      const key = email.toLowerCase();
+      if (keys.includes(key)) continue;
+      keys.push(key);
+      emails.push(email);
+    }
+    if (!emails.length) return null;
+    const key = [...keys].sort().join(',');
+    try {
+      const { clipboardLast } = await chrome.storage.local.get('clipboardLast');
+      if (clipboardLast === key) return null;
+    } catch (_) {
+      return null;
+    }
+    return { emails, key };
+  }
+
+  function markClipboardUsed(key) {
+    try {
+      chrome.storage.local.set({ clipboardLast: key }).catch(() => {});
+    } catch (_) {
+      // Extension reloaded; the new copy of this script takes over.
+    }
+  }
+
+  // Recipients Auto Fill should add, given the composer's current recipients: a newly
+  // copied address, else the next email-list address (unless the email is already
+  // addressed to someone on the list), else the To preset entries not there yet.
+  function recipientsToAdd(present, copied) {
+    if (copied) {
+      const missing = copied.emails.filter((email) => !present.includes(email.toLowerCase()));
+      return { text: missing.join(', '), listKey: '', clipboardKey: copied.key };
+    }
     const info = listInfo(settings);
     if (info.entries.length) {
       if (info.entries.some((e) => present.includes(e.key))) return { text: '', listKey: '' };
@@ -948,7 +1048,9 @@
 
     const x = r.left + Math.min(40, r.width / 2);
     const y = r.top + r.height / 2;
-    const target = subject.ownerDocument.elementFromPoint(x, y) || line;
+    // Only click the recipient line itself, never a window or toast lying over it.
+    const hit = subject.ownerDocument.elementFromPoint(x, y);
+    const target = hit && line.contains(hit) ? hit : line;
     const init = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, button: 0 };
     target.dispatchEvent(new PointerEvent('pointerdown', init));
     target.dispatchEvent(new MouseEvent('mousedown', init));
@@ -971,17 +1073,22 @@
     const subject = tracker.subject;
     let filled = 0;
 
+    const copied = await copiedRecipients();
     const parts = composerParts(subject);
-    const add = recipientsToAdd(recipientsText(subject, parts));
+    const add = recipientsToAdd(recipientsText(subject, parts), copied);
+    let added = false;
     if (add.text) {
       const to = parts.to || (await expandRecipients(tracker));
       if (to) {
         insertText(to, 'to', add.text);
         if (add.listKey) markListUsed(add.listKey);
+        added = true;
         filled++;
         await pause(80);
       }
     }
+    // Already in the email counts as used too.
+    if (add.clipboardKey && (added || !add.text)) markClipboardUsed(add.clipboardKey);
 
     if (hasPreset('subject') && !fieldText(subject).trim()) {
       insertText(subject, 'subject', presetText('subject'));
@@ -1004,7 +1111,8 @@
 
   async function runAutoFill(tracker) {
     if (tracker.busy) return;
-    if (!FIELDS.some(hasPreset)) {
+    const hasPresets = FIELDS.some(hasPreset);
+    if (!hasPresets && !settings.useClipboard) {
       openSettings('to');
       return;
     }
@@ -1027,6 +1135,7 @@
     if (!result) tracker.ui.set('Could not fill', 'setup', 'setup');
     else if (result.listFinished) tracker.ui.set('Email list finished', 'setup', 'setup');
     else if (result.filled > 0) tracker.ui.set('Filled', 'done', 'done');
+    else if (!hasPresets) tracker.ui.set('Copy an email first', 'setup', 'setup');
     else tracker.ui.set('Already filled', 'done', 'done');
     tracker.resetTimer = setTimeout(() => {
       tracker.busy = false;

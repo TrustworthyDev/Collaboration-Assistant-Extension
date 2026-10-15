@@ -32,6 +32,37 @@ async function openSettings(field, tab) {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender) => {
+// The service worker has no page to paste into, and a content script reading the
+// clipboard would make the mail site ask for permission. An offscreen document of the
+// extension reads it instead (see offscreen.js).
+let creatingOffscreen = null;
+
+async function ensureOffscreen() {
+  const open = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+  if (open.length) return;
+  if (!creatingOffscreen) {
+    creatingOffscreen = chrome.offscreen
+      .createDocument({
+        url: 'offscreen.html',
+        reasons: ['CLIPBOARD'],
+        justification: 'Auto Fill puts an email address you copied into the To box.',
+      })
+      .finally(() => { creatingOffscreen = null; });
+  }
+  await creatingOffscreen;
+}
+
+async function readClipboard() {
+  await ensureOffscreen();
+  const text = await chrome.runtime.sendMessage({ type: 'offscreen-read-clipboard' });
+  return typeof text === 'string' ? text : '';
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'open-settings') openSettings(message.field, sender.tab);
+  if (message && message.type === 'read-clipboard') {
+    readClipboard().then((text) => sendResponse({ text }), () => sendResponse({ text: '' }));
+    return true;
+  }
+  return undefined;
 });

@@ -104,6 +104,21 @@ input:focus, textarea:focus {
 .switch:focus-visible { box-shadow: 0 0 0 3px var(--focus); outline: none; }
 .switch:disabled { opacity: .45; cursor: not-allowed; }
 
+/* A switch with its label, e.g. "To from a copied email" */
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.option-text { display: grid; gap: 1px; min-width: 0; }
+.option-label { font-weight: 600; }
+
 .btn {
   padding: 6px 12px;
   border: 1px solid var(--border);

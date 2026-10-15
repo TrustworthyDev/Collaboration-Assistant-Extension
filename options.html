@@ -30,6 +30,16 @@
         <span class="hint">Separate several recipients with commas.</span>
         <span class="note" data-to-note hidden></span>
       </div>
+      <label class="option" for="use-clipboard">
+        <span class="option-text">
+          <span class="option-label">Fill To with a copied email address</span>
+          <span class="hint">Copy an address, then click Auto Fill: it goes in the To box, ahead of the email
+            list and the To text above. Each copied address is used once, so if you forget to copy the next
+            one, Auto Fill falls back to the email list or the To text instead of writing to the same person
+            again.</span>
+        </span>
+        <input type="checkbox" id="use-clipboard" class="switch" data-use-clipboard>
+      </label>
       <div class="field">
         <label for="preset-subject">Subject</label>
         <input id="preset-subject" data-preset="subject" placeholder="Subject line">

@@ -3,7 +3,7 @@ globalThis.PresetPaste = (() => {
   'use strict';
 
   const FIELDS = ['to', 'subject', 'body'];
-  const KEYS = ['presets', 'disabledSites', 'selectors', 'emailList', 'listUsed'];
+  const KEYS = ['presets', 'disabledSites', 'selectors', 'emailList', 'listUsed', 'useClipboard'];
   const EMAIL = /[^\s<>,;"']+@[^\s<>,;"']+/;
 
   const DEFAULTS = {
@@ -16,6 +16,8 @@ globalThis.PresetPaste = (() => {
     emailList: '',
     // Keys (lower-case addresses) of list entries already used, oldest first.
     listUsed: [],
+    // Auto Fill puts an email address you copied into To, ahead of the list and the To text.
+    useClipboard: true,
   };
 
   function merge(stored) {
@@ -25,6 +27,7 @@ globalThis.PresetPaste = (() => {
       selectors: { ...DEFAULTS.selectors, ...(stored.selectors || {}) },
       emailList: typeof stored.emailList === 'string' ? stored.emailList : '',
       listUsed: Array.isArray(stored.listUsed) ? stored.listUsed : [],
+      useClipboard: typeof stored.useClipboard === 'boolean' ? stored.useClipboard : DEFAULTS.useClipboard,
     };
   }
 
