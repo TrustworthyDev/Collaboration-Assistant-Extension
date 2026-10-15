@@ -34,14 +34,32 @@ separated with commas. In the To text, line breaks are turned into commas.
 Every open email gets an **Auto Fill** button in its title bar, right after the title and left of the minimise /
 expand / close buttons. One click fills the whole email:
 
-- **To**: adds your recipients. Recipients that are already there are not added again. If the mail app has folded the
+- **To**: adds the email address you copied, else your recipients (see below). Recipients that are already there are not added again. If the mail app has folded the
   To row into a line of names, Auto Fill opens it first.
 - **Subject**: filled when it is empty; a subject you already typed is kept.
 - **Message**: your text goes at the top, above anything already there such as a signature. It is not added again
   if it is already in the message.
 
+Auto Fill only touches the email whose button you clicked. With several emails open, one hidden behind
+another (such as an earlier one still showing "Your message has been sent") shows no Auto Fill button.
+
 So clicking Auto Fill twice does no harm. The button briefly shows **Filled**, or **Already filled** when there was
 nothing left to add.
+
+### Copied email address
+
+Copy the address you want to write to (from a spreadsheet, a web page, anywhere), then click **Auto Fill**. The
+address goes in the To box, and Subject and Message are filled from your presets as usual.
+
+- A copied address comes first, ahead of the Email list and the To text. Copying `Bob <bob@example.com>` works too;
+  only the address is used. Several copied addresses are all added.
+- Each copied address is used once. If you forget to copy the next one, the clipboard still holds the last address,
+  so Auto Fill ignores it and falls back to the Email list or the To text, instead of writing to the same person again.
+- Long copied text (over 1000 characters) is ignored, as it was not copied as a recipient.
+- Switch it off with **To from a copied email** on the popup's Content tab, or in **More settings**.
+
+Reading the clipboard needs the "Read data you copy and paste" permission, which Chrome asks you to accept when the
+extension is installed or updated. The extension reads the clipboard only when you click Auto Fill.
 
 ### Email list
 
@@ -79,7 +97,8 @@ box → **Inspect**, then copy something stable such as its `id` or `aria-label`
 | --- | --- |
 | `manifest.json` | Extension manifest (MV3) |
 | `content.js` | Detects the boxes and composers, shows the Paste and Auto Fill buttons, inserts the text |
-| `background.js` | Injects into tabs already open at install; opens the popup from the "Set up" button |
+| `background.js` | Injects into tabs already open at install; opens the popup from the "Set up" button; reads the clipboard for Auto Fill |
+| `offscreen.html` / `offscreen.js` | Hidden page that reads the clipboard text for `background.js` |
 | `common.js` | Settings defaults and site matching, shared by all pages |
 | `popup.html` / `popup.js` | Toolbar popup: Content and Email list tabs, switch the current site on or off |
 | `options.html` / `options.js` | Full settings: presets, email list, switched-off sites, custom selectors |

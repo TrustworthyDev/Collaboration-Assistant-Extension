@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Collaboration Assistant",
-  "version": "1.3.0",
-  "description": "Fills the To, Subject and Message of an email with your preset text: a Paste button on each box, or Auto Fill for all three.",
+  "version": "1.4.0",
+  "description": "Fills the To, Subject and Message of an email with your preset text or a copied address: a Paste button on each box, or Auto Fill for all three.",
   "minimum_chrome_version": "116",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": ["storage", "activeTab", "scripting", "clipboardRead", "offscreen"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"
