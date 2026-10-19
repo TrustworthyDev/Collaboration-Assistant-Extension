@@ -46,6 +46,25 @@ another (such as an earlier one still showing "Your message has been sent") show
 So clicking Auto Fill twice does no harm. The button briefly shows **Filled**, or **Already filled** when there was
 nothing left to add.
 
+### Links in the message
+
+Write a link in the Message text as `[title](address)`:
+
+```text
+Hi,
+
+[Exploring a Remote Work](https://docs.google.com/document/d/…)
+
+Please read this document first.
+```
+
+The email then shows only **Exploring a Remote Work**, as a clickable link. Only `https://`, `http://` and `mailto:`
+addresses become links. In a plain-text message box, which cannot hold links, the address is kept after the title:
+`Exploring a Remote Work (https://…)`.
+
+You don't have to type this yourself: copy the text from an email (or any web page) and paste it into the extension's
+Message box. Its links are turned into `[title](address)` as they are pasted, so the address is not lost.
+
 ### Copied email address
 
 Copy the address you want to write to (from a spreadsheet, a web page, anywhere), then click **Auto Fill**. The

@@ -36,6 +36,62 @@ function initTabs() {
   select(tabs.find((t) => t.id === saved) || tabs[0]);
 }
 
+// Copied rich text (e.g. from an email) as Message text, with each link written as
+// [title](url) so the address survives the plain text box. Returns '' when the copied
+// text has no web or mailto links, leaving the normal paste alone.
+function htmlToPresetText(html) {
+  'use strict';
+
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const linkUrl = (a) => {
+    const href = (a.getAttribute('href') || '').trim();
+    return /^(https?:\/\/|mailto:)\S+$/i.test(href) ? href : '';
+  };
+  if (![...doc.querySelectorAll('a[href]')].some(linkUrl)) return '';
+
+  const PARAGRAPH = /^(P|H[1-6]|BLOCKQUOTE|PRE|UL|OL|TABLE)$/;
+  const LINE = /^(DIV|LI|TR|SECTION|ARTICLE|HEADER|FOOTER|ADDRESS)$/;
+  const SKIP = /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|TITLE|META|LINK)$/;
+  let out = '';
+  const breakTo = (count) => {
+    if (!out) return;
+    const have = out.length - out.replace(/\n+$/, '').length;
+    out += '\n'.repeat(Math.max(0, count - have));
+  };
+
+  (function walk(node, pre) {
+    for (const child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += pre ? child.nodeValue : child.nodeValue.replace(/\s+/g, ' ');
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE || SKIP.test(child.tagName)) continue;
+      const tag = child.tagName;
+      if (tag === 'BR') {
+        out += '\n';
+        continue;
+      }
+      const url = tag === 'A' ? linkUrl(child) : '';
+      if (url) {
+        const title = child.textContent.replace(/\s+/g, ' ').trim().replace(/[[\]]/g, '');
+        out += title && title !== url ? `[${title}](${url})` : url;
+        continue;
+      }
+      const lines = PARAGRAPH.test(tag) ? 2 : LINE.test(tag) ? 1 : 0;
+      if (lines) breakTo(lines);
+      walk(child, pre || tag === 'PRE');
+      if (lines) breakTo(lines);
+    }
+  })(doc.body, false);
+
+  return out
+    .replace(/ /g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 globalThis.bindSettingsForm = async function bindSettingsForm() {
   'use strict';
 
@@ -109,6 +165,20 @@ globalThis.bindSettingsForm = async function bindSettingsForm() {
     el.addEventListener('input', () => {
       settings.presets[el.dataset.preset] = el.value;
       persist('presets');
+    });
+  }
+
+  // Pasting text copied from an email keeps its links as [title](url).
+  for (const el of presetInputs.filter((input) => input.dataset.preset === 'body')) {
+    el.addEventListener('paste', (event) => {
+      const html = event.clipboardData && event.clipboardData.getData('text/html');
+      const text = html ? htmlToPresetText(html) : '';
+      if (!text) return;
+      event.preventDefault();
+      // insertText keeps Ctrl+Z working and fires the input event that saves.
+      if (document.execCommand('insertText', false, text)) return;
+      el.setRangeText(text, el.selectionStart, el.selectionEnd, 'end');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
     });
   }
   for (const el of selectorInputs) {
