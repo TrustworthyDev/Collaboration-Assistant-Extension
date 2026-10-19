@@ -559,15 +559,48 @@
     return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   }
 
+  // Links in the message are written [title](url). Only web and mailto addresses count.
+  const LINK = /\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s()]+)\)/gi;
+
+  function hasLinks(text) {
+    return text.search(LINK) !== -1;
+  }
+
+  // The text as the reader sees it: just the title of each link, or "title (url)" in a
+  // plain text box, which cannot show links.
+  function linksAsText(text, withUrl) {
+    return text.replace(LINK, (_, title, url) => (withUrl ? `${title} (${url})` : title));
+  }
+
+  // One line split into text and links; always ends with a (possibly empty) text part.
+  function lineParts(line, links) {
+    const parts = [];
+    let last = 0;
+    if (links) {
+      for (const match of line.matchAll(LINK)) {
+        parts.push({ text: line.slice(last, match.index) }, { title: match[1], url: match[2] });
+        last = match.index + match[0].length;
+      }
+    }
+    parts.push({ text: line.slice(last) });
+    return parts;
+  }
+
+  function linksAsHtml(text) {
+    return text.split(/\r?\n/).map((line) => lineParts(line, true).map((part) => (part.url
+      ? `<a href="${escapeHtml(part.url)}">${escapeHtml(part.title)}</a>`
+      : escapeHtml(part.text))).join('')).join('<br>');
+  }
+
   // Lets the site's own paste handling run (recipient fields turn pasted addresses
   // into chips, rich editors keep line breaks). Returns true if the site handled it.
-  function dispatchPaste(el, text) {
+  function dispatchPaste(el, text, html) {
     let data;
     try {
       data = new DataTransfer();
       data.setData('text/plain', text);
       if (!isTextControl(el)) {
-        data.setData('text/html', text.split(/\r?\n/).map(escapeHtml).join('<br>'));
+        data.setData('text/html', html || text.split(/\r?\n/).map(escapeHtml).join('<br>'));
       }
     } catch (_) {
       return false;
@@ -602,7 +635,7 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
-  function insertIntoEditable(el, text) {
+  function insertIntoEditable(el, text, links) {
     const doc = el.ownerDocument;
     const selection = doc.getSelection();
     let range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
@@ -615,8 +648,18 @@
     const fragment = doc.createDocumentFragment();
     text.split(/\r?\n/).forEach((line, i) => {
       if (i) fragment.appendChild(doc.createElement('br'));
-      fragment.appendChild(doc.createTextNode(line));
+      for (const part of lineParts(line, links)) {
+        if (part.url) {
+          const a = doc.createElement('a');
+          a.href = part.url;
+          a.textContent = part.title;
+          fragment.appendChild(a);
+        } else if (part.text) {
+          fragment.appendChild(doc.createTextNode(part.text));
+        }
+      }
     });
+    if (!fragment.lastChild) fragment.appendChild(doc.createTextNode(''));
     const last = fragment.lastChild;
     range.insertNode(fragment);
     range.setStartAfter(last);
@@ -628,6 +671,13 @@
 
   function insertText(el, type, text) {
     if (!isFocused(el)) el.focus();
+    if (type === 'body' && hasLinks(text)) {
+      if (!isTextControl(el)) {
+        insertLinkedText(el, text);
+        return;
+      }
+      text = linksAsText(text, true);
+    }
     if (type !== 'subject' && dispatchPaste(el, text)) return;
 
     // execCommand goes through the browser's editing pipeline, so frameworks
@@ -642,6 +692,22 @@
 
     if (isTextControl(el)) setControlValue(el, text);
     else insertIntoEditable(el, text);
+  }
+
+  // A message with [title](url) links into a rich editor: real links that show only the
+  // title. The browser's own HTML insertion goes first, as the editor's Link button
+  // would; a site's paste handling may keep only the plain text and lose the links.
+  function insertLinkedText(el, text) {
+    const html = linksAsHtml(text);
+    let inserted = false;
+    try {
+      inserted = el.ownerDocument.execCommand('insertHTML', false, html);
+    } catch (_) {
+      inserted = false;
+    }
+    if (inserted) return;
+    if (dispatchPaste(el, linksAsText(text, true), html)) return;
+    insertIntoEditable(el, text, true);
   }
 
   function placeCaretAtStart(el) {
@@ -1099,7 +1165,8 @@
     if (hasPreset('body')) {
       const { body } = composerParts(subject);
       const text = presetText('body');
-      if (body && !squash(fieldText(body)).includes(squash(text).slice(0, 80))) {
+      const shown = body ? linksAsText(text, isTextControl(body)) : text;
+      if (body && !squash(fieldText(body)).includes(squash(shown).slice(0, 80))) {
         const hasContent = squash(fieldText(body)) !== '';
         placeCaretAtStart(body);
         insertText(body, 'body', hasContent ? text + '\n\n' : text);
